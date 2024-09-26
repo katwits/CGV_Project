@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block World with Trees</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
+
+        let camera, scene, renderer;
+        let playerSpeed = 0.1;
+        let lookUp = false;
+        let lookDown = false;
+        let lookLeft = false;
+        let lookRight = false;
+        const lookSpeed = 0.04; // Speed of looking up/down
+        let cameraRotationX = 0; // Camera rotation in the X direction
+        let cameraRotationY = 0; 
+        let sun, sunMesh;
+        let isSunRising = true; // Track the sun's movement direction
+        const sunCycleDuration = 10; // Duration for a full cycle (rise and set)
+
+        // Initialize the scene, camera, and renderer
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+
+            // Create a camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.8, 5); // Player starts above the ground
+
+            // Create a renderer and attach it to the document
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;  // Enable shadow maps
+            document.body.appendChild(renderer.domElement);
+
+            // Generate a basic block world and add trees
+            generateWorld();
+            addTrees();
+
+            // Add the sun (light source)
+            addSun();
+
+            // Start the sun animation
+            setInterval(animateSun, sunCycleDuration * 1000); // 10 seconds
+
+            // Add event listeners for movement
+            window.addEventListener('keydown', onKeyDown, false);
+            window.addEventListener('keyup', onKeyUp, false);
+
+            // Start the animation loop
+            animate();
+        }
+
+        // Create the blocky world
+        function generateWorld() {
+            const blockSize = 0.2;
+            const worldSize = 100;
+
+            const blockGeometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+            const blockMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown blocks (Lambert for shading)
+
+            // Create a simple 10x10 grid of blocks
+            for (let x = -worldSize / 2; x < worldSize / 2; x++) {
+                for (let z = -worldSize / 2; z < worldSize / 2; z++) {
+                    const block = new THREE.Mesh(blockGeometry, blockMaterial);
+                    block.position.set(x * blockSize, 0, z * blockSize); // Y=0 for flat terrain
+                    block.castShadow = true;   // Block will cast shadows
+                    block.receiveShadow = true; // Block will receive shadows
+                    scene.add(block);
+                }
+            }
+
+            // Optionally add some sky color
+            const skyColor = 0x87CEEB; // Light blue
+            scene.background = new THREE.Color(skyColor);
+        }
+
+        // Add trees to the scene
+        function addTrees() {
+            const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 1.5); // Tree trunk
+            const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown trunk
+
+            const leavesGeometry = new THREE.ConeGeometry(0.8, 2, 8); // Tree leaves
+            const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 }); // Green leaves
+
+            const treePositions = [
+                [-3, 0, -3],
+                [4, 0, 4],
+                [-5, 0, 1],
+                [3, 0, -4],
+                [-2, 0, 5],
+            ];
+
+            treePositions.forEach((pos) => {
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.set(pos[0], 0.75, pos[2]); // Trunk at height 0.75
+
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.set(pos[0], 2, pos[2]); // Leaves at height 2
+
+                trunk.castShadow = true;
+                trunk.receiveShadow = true;
+                leaves.castShadow = true;
+                leaves.receiveShadow = true;
+
+                scene.add(trunk);
+                scene.add(leaves);
+            });
+        }
+
+        // Add a sun to the scene
+        // Animate the sun's position
+function animateSun() {
+    const sunInitialY = 20; // Initial height of the sun
+    const sunFinalY = -5; // Final height of the sun
+    const sunDirection = isSunRising ? -1 : 1; // Determine direction of movement
+
+    // Move the sun
+    sun.position.y += sunDirection * (sunInitialY - sunFinalY) / (sunCycleDuration * 60); // 60 frames per second
+
+    // Update the visual representation of the sun
+    sunMesh.position.copy(sun.position);
+
+    // Change the sky color based on the sun's position
+    const skyColor = sun.position.y > 0 ? 0x87CEEB : 0x1E90FF; // Change color based on sun's height
+    scene.background = new THREE.Color(skyColor);
+
+    // Toggle sun direction when it reaches final position
+    if (sun.position.y <= sunFinalY || sun.position.y >= sunInitialY) {
+        isSunRising = !isSunRising; // Toggle the sun direction
+    }
+}
+
+// Initialize the sun position
+function addSun() {
+    // Create a directional light to simulate the sun
+    sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(10, 20, 10); // Start high in the sky
+    sun.castShadow = true;
+
+    // Shadow properties
+    sun.shadow.mapSize.width = 512;
+    sun.shadow.mapSize.height = 512;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 50;
+
+    scene.add(sun);
+
+    const sunGeometry = new THREE.SphereGeometry(1, 16, 16);
+    const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+    sunMesh.position.copy(sun.position);
+    scene.add(sunMesh);
+}
+
+// Start the sun animation
+setInterval(animateSun, 1000 / 60); // 60 FPS
+
+        // Handle key press events to move the player
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'ArrowUp':
+                    lookUp = true;
+                    break;
+                case 'ArrowDown':
+                    lookDown = true;
+                    break;
+                case 'ArrowLeft':
+                    lookLeft = true;
+                    break;
+                case 'ArrowRight':
+                    lookRight = true;
+                    break;
+            }
+        }
+
+        // Handle key release events
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'ArrowUp':
+                    lookUp = false;
+                    break;
+                case 'ArrowDown':
+                    lookDown = false;
+                    break;
+                case 'ArrowLeft':
+                    lookLeft = false;
+                    break;
+                case 'ArrowRight':
+                    lookRight = false;
+                    break;
+            }
+        }
+
+        // Animate the scene
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate camera based on look up and look down
+            if (lookUp) {
+                cameraRotationX += lookSpeed;
+                cameraRotationX = Math.max(-Math.PI / 2, cameraRotationX); // Limit look up
+                camera.rotation.x = cameraRotationX; // Apply rotation to camera
+
+            }
+            if (lookDown) {
+                cameraRotationX -= lookSpeed;
+                cameraRotationX = Math.min(Math.PI / 2, cameraRotationX); // Limit look down
+                camera.rotation.x = cameraRotationX; // Apply rotation to camera
+
+            }
+            if (lookLeft) {
+                cameraRotationY += lookSpeed;
+                cameraRotationY = Math.max(-Math.PI / 2, cameraRotationY); // Limit look up
+                camera.rotation.y = cameraRotationY; // Apply rotation to camera
+
+            }
+            if (lookRight) {
+                cameraRotationY -= lookSpeed;
+                cameraRotationY = Math.min(Math.PI / 2, cameraRotationY); // Limit look down
+                camera.rotation.y = cameraRotationY; // Apply rotation to camera
+                
+
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Start the scene
+        init();
+    </script>
+</body>
+</html>
